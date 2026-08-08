@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Theme color mappings from CSS custom properties */
+  --color-page-bg: var(--bg);
+  --color-page-surface: var(--surface);
+  --color-page-raised: var(--surface-raised);
+  --color-page-hover: var(--surface-hover);
+  --color-page-border: var(--border);
+  --color-page-border-strong: var(--border-strong);
+
+  /* Primary Brand Salmon Orange */
+  --color-primary: #f97040;
+  --color-primary-hover: #e0582a;
+  --color-primary-active: #cf332b;
+
+  /* Secondary Coral */
+  --color-coral: #e8453c;
+
+  /* Dynamic Typography */
+  --color-text-main: var(--text-main);
+  --color-text-sub: var(--text-sub);
+  --color-text-mute: var(--text-mute);
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+}
+
+/* Light Theme Variables (:root) */
+:root {
+  --bg: #fdf6ee;
+  --surface: #f4e8d8;
+  --surface-raised: #ecdcca;
+  --surface-hover: #e3d2bf;
+  --border: rgba(30, 20, 40, 0.08);
+  --border-strong: rgba(30, 20, 40, 0.16);
+
+  --text-main: #1c1427;
+  --text-sub: #5c526b;
+  --text-mute: #8e849e;
+}
+
+/* Dark Theme Variables (.dark) */
+.dark {
+  --bg: #0f0f18;
+  --surface: #141421;
+  --surface-raised: #1c1c2e;
+  --surface-hover: #26263c;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text-main: #fdf6ee;
+  --text-sub: #a8a3ba;
+  --text-mute: #645f7c;
+}
+
+@keyframes float-mascot {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float {
+  animation: float-mascot 3.5s ease-in-out infinite;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  background-color: var(--bg);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
