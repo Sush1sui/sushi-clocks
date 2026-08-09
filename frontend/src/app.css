@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-display: 'Sora', system-ui, sans-serif;
@@ -15,7 +17,7 @@
 
   /* Primary Brand Salmon Orange */
   --color-primary: #f97040;
-  --color-primary-hover: #e0582a;
+  --color-primary-hover: #e55f32;
   --color-primary-active: #cf332b;
 
   /* Secondary Coral */
@@ -33,30 +35,44 @@
 
 /* Light Theme Variables (:root) */
 :root {
-  --bg: #fdf6ee;
-  --surface: #f4e8d8;
-  --surface-raised: #ecdcca;
-  --surface-hover: #e3d2bf;
-  --border: rgba(30, 20, 40, 0.08);
-  --border-strong: rgba(30, 20, 40, 0.16);
+  --bg: #fbf6f0;
+  --surface: #f4eae0;
+  --surface-raised: #ebded2;
+  --surface-hover: #e2d3c5;
+  --border: rgba(30, 20, 40, 0.09);
+  --border-strong: rgba(30, 20, 40, 0.18);
 
-  --text-main: #1c1427;
-  --text-sub: #5c526b;
-  --text-mute: #8e849e;
+  --text-main: #14121e;
+  --text-sub: #544e66;
+  --text-mute: #857e98;
+
+  /* Watermark properties in light mode */
+  --watermark-opacity: 0.09;
+  --watermark-filter: contrast(1.1) saturate(1.15) brightness(0.95);
 }
 
 /* Dark Theme Variables (.dark) */
 .dark {
-  --bg: #0f0f18;
-  --surface: #141421;
-  --surface-raised: #1c1c2e;
-  --surface-hover: #26263c;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.16);
+  --bg: #0F0E17;
+  --surface: #15141D;
+  --surface-raised: #1C1B26;
+  --surface-hover: #22212F;
+  --border: #2A2935;
+  --border-strong: #383747;
 
-  --text-main: #fdf6ee;
-  --text-sub: #a8a3ba;
-  --text-mute: #645f7c;
+  --text-main: #F4F3F7;
+  --text-sub: #8D8C99;
+  --text-mute: #5A5966;
+
+  /* Watermark properties in dark mode */
+  --watermark-opacity: 0.09;
+  --watermark-filter: none;
+}
+
+.watermark-logo {
+  opacity: var(--watermark-opacity);
+  filter: var(--watermark-filter);
+  transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
 @keyframes float-mascot {
@@ -64,12 +80,12 @@
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 }
 
 .animate-float {
-  animation: float-mascot 3.5s ease-in-out infinite;
+  animation: float-mascot 4s ease-in-out infinite;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -80,13 +96,12 @@ html {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .font-display {
   font-family: var(--font-display);
 }
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }

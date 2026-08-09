@@ -14,9 +14,9 @@
 	} = $props();
 </script>
 
-<div class="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] hover:border-[#f97040]/40 transition-colors shadow-sm {className}">
-	<div class="w-8 h-8 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] flex items-center justify-center mb-3 text-[#f97040]">
-		<Icon class="w-4 h-4" />
+<div class="p-3.5 rounded-lg bg-[var(--surface)] border border-[var(--border)] hover:border-[#f97040]/30 transition-colors shadow-sm {className}">
+	<div class="w-7 h-7 rounded-md bg-[var(--surface-raised)] border border-[var(--border)] flex items-center justify-center mb-2.5 text-[#f97040]">
+		<Icon class="w-3.5 h-3.5" />
 	</div>
 	<div class="text-sm font-semibold text-[var(--text-main)]">{title}</div>
 	<div class="text-xs text-[var(--text-sub)] mt-1">{description}</div>

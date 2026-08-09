@@ -22,7 +22,7 @@
 	} & HTMLInputAttributes = $props();
 
 	let showPassword = $state(false);
-	const isPasswordField = type === 'password';
+	const isPasswordField = $derived(type === 'password');
 </script>
 
 <div class="space-y-1.5 {className}">
@@ -38,20 +38,20 @@
 			bind:value
 			{required}
 			{placeholder}
-			class="w-full h-11 px-3.5 rounded-xl bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-main)] placeholder-[var(--text-mute)] text-sm focus:outline-none focus:border-[#f97040] transition-colors {isPasswordField ? 'pr-11' : ''}"
+			class="w-full h-10 px-3.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] text-[var(--text-main)] placeholder-[var(--text-mute)] text-xs sm:text-sm focus:outline-none focus:border-[#f97040] focus:ring-1 focus:ring-[#f97040]/30 transition-colors {isPasswordField ? 'pr-10' : ''}"
 			{...restProps}
 		/>
 		{#if isPasswordField}
 			<button
 				type="button"
 				onclick={() => (showPassword = !showPassword)}
-				class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-mute)] hover:text-[var(--text-main)] transition-colors p-1"
+				class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-mute)] hover:text-[var(--text-main)] transition-colors p-1"
 				aria-label={showPassword ? 'Hide password' : 'Show password'}
 			>
 				{#if showPassword}
-					<EyeOff class="w-4 h-4" />
+					<EyeOff class="w-3.5 h-3.5" />
 				{:else}
-					<Eye class="w-4 h-4" />
+					<Eye class="w-3.5 h-3.5" />
 				{/if}
 			</button>
 		{/if}

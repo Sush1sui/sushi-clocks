@@ -8,7 +8,7 @@
 <button
 	type="button"
 	onclick={toggleMode}
-	class="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors cursor-pointer {className}"
+	class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface)] hover:bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--text-sub)] hover:text-[var(--text-main)] transition-colors cursor-pointer {className}"
 	aria-label="Toggle theme"
 	title={mode.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
 >
