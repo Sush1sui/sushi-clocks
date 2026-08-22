@@ -15,6 +15,7 @@ import (
 	"github.com/sushi-clocks/backend/internal/auth"
 	"github.com/sushi-clocks/backend/internal/config"
 	"github.com/sushi-clocks/backend/internal/db"
+	"github.com/sushi-clocks/backend/internal/domain"
 	"github.com/sushi-clocks/backend/internal/repository"
 )
 
@@ -84,9 +85,11 @@ func main() {
 
 			userRepo := repository.NewUserRepository(pool)
 			companyRepo := repository.NewCompanyRepository(pool)
+			timesheetRepo := repository.NewTimesheetRepository(pool)
 
 			authHandler := api.NewAuthHandler(cfg, userRepo, jwtMgr)
 			companyHandler := api.NewCompanyHandler(companyRepo)
+			timesheetHandler := api.NewTimesheetHandler(timesheetRepo)
 
 			rateLimiter := api.NewIPRateLimiter(5.0, 15.0) // 5 req/sec with burst 15
 
@@ -98,6 +101,7 @@ func main() {
 			// Protected routes
 			authMiddleware := auth.RequireAuth(jwtMgr)
 			superAdminMiddleware := auth.RequireSuperAdmin(jwtMgr)
+			adminHrMiddleware := auth.RequireRoles(jwtMgr, domain.RoleAdmin, domain.RoleHR)
 
 			mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 
@@ -107,6 +111,12 @@ func main() {
 
 			// Tenant-scoped Company details route
 			mux.Handle("GET /api/v1/companies/{id}", authMiddleware(http.HandlerFunc(companyHandler.GetCompanyByID)))
+
+			// Timesheet & Attendance routes
+			mux.Handle("POST /api/v1/timesheets/clock-in", authMiddleware(http.HandlerFunc(timesheetHandler.ClockIn)))
+			mux.Handle("POST /api/v1/timesheets/clock-out", authMiddleware(http.HandlerFunc(timesheetHandler.ClockOut)))
+			mux.Handle("GET /api/v1/timesheets/status", authMiddleware(http.HandlerFunc(timesheetHandler.GetStatus)))
+			mux.Handle("GET /api/v1/companies/{id}/attendance/summary", adminHrMiddleware(http.HandlerFunc(timesheetHandler.GetCompanySummary)))
 		}
 	} else {
 		log.Println("DATABASE_URL not set, database features disabled")

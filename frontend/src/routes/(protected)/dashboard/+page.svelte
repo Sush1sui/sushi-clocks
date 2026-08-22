@@ -173,10 +173,10 @@
 			<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
 				<div class="space-y-1">
 					<h1 class="font-display text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-main)]">
-						Multi-Tenant Organizations Hub
+						Organizations
 					</h1>
 					<p class="text-xs sm:text-sm text-[var(--text-sub)] leading-relaxed max-w-2xl">
-						Manage platform organizations, provision initial tenant administrators, and oversee tenant isolation across PostgreSQL & MongoDB telemetry.
+						Manage registered companies, monitor overall usage, and set up new organization workspaces.
 					</p>
 				</div>
 
@@ -187,7 +187,7 @@
 						onclick={() => (showCreateModal = true)}
 					>
 						<Plus class="w-3.5 h-3.5 mr-1" />
-						<span>Provision Organization</span>
+						<span>Add Company</span>
 					</Button>
 				</div>
 			</div>
@@ -198,13 +198,13 @@
 			
 			<div class="p-3.5 sm:p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
 				<div class="flex items-center justify-between">
-					<span class="text-[0.65rem] font-mono tracking-widest uppercase text-[var(--text-mute)]">TOTAL TENANTS</span>
+					<span class="text-[0.65rem] font-mono tracking-widest uppercase text-[var(--text-mute)]">TOTAL COMPANIES</span>
 					<div class="w-6 h-6 rounded bg-[#f97040]/10 text-[#f97040] flex items-center justify-center">
 						<Building2 class="w-3 h-3" />
 					</div>
 				</div>
 				<div class="font-display text-xl font-bold tracking-tight">{companies.length}</div>
-				<div class="text-[11px] text-[var(--text-sub)]">Provisioned Organizations</div>
+				<div class="text-[11px] text-[var(--text-sub)]">Registered Organizations</div>
 			</div>
 
 			<div class="p-3.5 sm:p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
@@ -215,7 +215,7 @@
 					</div>
 				</div>
 				<div class="font-display text-xl font-bold tracking-tight">{totalEmployeesAcrossPlatform}</div>
-				<div class="text-[11px] text-[var(--text-sub)]">Users across all tenants</div>
+				<div class="text-[11px] text-[var(--text-sub)]">Staff across all companies</div>
 			</div>
 
 			<div class="p-3.5 sm:p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
@@ -226,18 +226,18 @@
 					</div>
 				</div>
 				<div class="font-display text-xl font-bold tracking-tight">{uniqueCurrencies || 1} Active</div>
-				<div class="text-[11px] text-[var(--text-sub)]">Multi-currency engine</div>
+				<div class="text-[11px] text-[var(--text-sub)]">Supported Currencies</div>
 			</div>
 
 			<div class="p-3.5 sm:p-4 rounded-lg bg-[var(--surface)] border border-[var(--border)] space-y-1.5">
 				<div class="flex items-center justify-between">
-					<span class="text-[0.65rem] font-mono tracking-widest uppercase text-[var(--text-mute)]">ARCHIVAL ENGINE</span>
+					<span class="text-[0.65rem] font-mono tracking-widest uppercase text-[var(--text-mute)]">DATA BACKUPS</span>
 					<div class="w-6 h-6 rounded bg-purple-500/10 text-purple-400 flex items-center justify-center">
 						<UploadCloud class="w-3 h-3" />
 					</div>
 				</div>
-				<div class="font-display text-sm font-bold text-emerald-400">Timezone-Aware</div>
-				<div class="text-[11px] text-[var(--text-sub)]">Monthly Cloudflare R2 archival</div>
+				<div class="font-display text-sm font-bold text-emerald-400">Automated Daily</div>
+				<div class="text-[11px] text-[var(--text-sub)]">Encrypted cloud snapshots</div>
 			</div>
 
 		</section>
@@ -273,7 +273,7 @@
 					<div class="space-y-0.5">
 						<h3 class="text-sm font-semibold">No organizations found</h3>
 						<p class="text-xs text-[var(--text-sub)] max-w-sm mx-auto">
-							{searchQuery ? 'No organizations matched your search filter.' : 'Provision your first tenant organization with an initial administrator account to get started.'}
+							{searchQuery ? 'No organizations matched your search filter.' : 'Add your first company and assign an administrator to get started.'}
 						</p>
 					</div>
 					{#if !searchQuery}
@@ -283,7 +283,7 @@
 							onclick={() => (showCreateModal = true)}
 						>
 							<Plus class="w-3 h-3 mr-1" />
-							<span>Provision First Organization</span>
+							<span>Add First Company</span>
 						</Button>
 					{/if}
 				</div>
@@ -353,10 +353,10 @@
 				<div class="flex items-center justify-between border-b border-[var(--border)] pb-2.5">
 					<div class="space-y-0.5">
 						<h3 class="font-display text-base font-bold tracking-tight text-[var(--text-main)]">
-							Provision New Organization
+							Add New Company
 						</h3>
 						<p class="text-[11px] text-[var(--text-sub)]">
-							Configure company settings and initial administrator.
+							Configure company profile and primary administrator.
 						</p>
 					</div>
 					<button
@@ -388,12 +388,12 @@
 					<!-- Organization Details -->
 					<div class="space-y-2">
 						<span class="text-[10px] font-mono font-semibold uppercase tracking-widest text-[#f97040]">
-							1. Organization Profile
+							1. Company Profile
 						</span>
 
 						<Input
 							id="compName"
-							label="Organization Name"
+							label="Company Name"
 							bind:value={formName}
 							placeholder="e.g. Acme Corporation"
 							required
@@ -442,7 +442,7 @@
 					<!-- Initial Company Admin -->
 					<div class="space-y-2 pt-1.5 border-t border-[var(--border)]">
 						<span class="text-[10px] font-mono font-semibold uppercase tracking-widest text-[#f97040]">
-							2. Initial Company Admin
+							2. Primary Administrator
 						</span>
 
 						<div class="grid grid-cols-2 gap-2">
@@ -498,7 +498,7 @@
 							loading={isCreating}
 							class="h-8 px-3.5 text-xs font-semibold"
 						>
-							<span>Provision Organization</span>
+							<span>Create Company</span>
 						</Button>
 					</div>
 				</form>

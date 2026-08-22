@@ -15,10 +15,23 @@
 
 	let email = $state('');
 	let password = $state('');
+	let rememberPassword = $state(false);
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 
 	const user = $derived(page.data.user);
+
+	$effect(() => {
+		if (typeof window !== 'undefined') {
+			const savedEmail = localStorage.getItem('sushi_remember_email');
+			const savedPass = localStorage.getItem('sushi_remember_password');
+			if (savedEmail && savedPass) {
+				email = savedEmail;
+				password = savedPass;
+				rememberPassword = true;
+			}
+		}
+	});
 
 	async function handleSignIn(e: Event) {
 		e.preventDefault();
@@ -26,6 +39,15 @@
 		isLoading = true;
 
 		try {
+			if (typeof window !== 'undefined') {
+				if (rememberPassword) {
+					localStorage.setItem('sushi_remember_email', email);
+					localStorage.setItem('sushi_remember_password', password);
+				} else {
+					localStorage.removeItem('sushi_remember_email');
+					localStorage.removeItem('sushi_remember_password');
+				}
+			}
 			await login(email, password);
 			await invalidateAll();
 			await goto('/dashboard');
@@ -94,9 +116,9 @@
 				<div class="space-y-1">
 					<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#f97040]/10 border border-[#f97040]/25 text-[#f97040] text-xs font-mono font-medium">
 						<Sparkles class="w-3.5 h-3.5" />
-						<span>Multi-Tenant System</span>
+						<span>Time & Attendance</span>
 					</div>
-					<div class="text-xs text-[var(--text-sub)]">Precision timestamp logging per company</div>
+					<div class="text-xs text-[var(--text-sub)]">Accurate attendance and payroll management</div>
 				</div>
 			</div>
 
@@ -116,7 +138,7 @@
 				<FeatureCard
 					icon={Zap}
 					title="Live Attendance"
-					description="Zero polling live events"
+					description="Real-time employee activity"
 				/>
 				<FeatureCard
 					icon={Shield}
@@ -126,14 +148,14 @@
 				<FeatureCard
 					icon={Users}
 					title="Leave Tracking"
-					description="Auto cascade deductions"
+					description="Automatic balance tracking"
 				/>
 			</div>
 		</div>
 
 		<!-- Left Footer -->
 		<footer class="relative z-10 flex items-center justify-between text-xs text-[var(--text-mute)] pt-4 font-mono">
-			<span>TENANT ISOLATION: STRICT COMPANY UUID</span>
+			<span>SECURE & ENCRYPTED WORKSPACE</span>
 			<span>GO + SVELTEKIT</span>
 		</footer>
 	</section>
@@ -222,14 +244,15 @@
 							/>
 						</div>
 
-						<!-- Remember Me & Security Meta -->
+						<!-- Remember Password & Security Meta -->
 						<div class="flex items-center justify-between text-xs text-[var(--text-sub)] pt-1">
 							<label class="flex items-center gap-2 cursor-pointer select-none">
 								<input
 									type="checkbox"
-									class="rounded bg-[var(--surface-raised)] border-[var(--border)] text-[#f97040] focus:ring-0 focus:ring-offset-0"
+									bind:checked={rememberPassword}
+									class="rounded bg-[var(--surface-raised)] border-[var(--border)] text-[#f97040] focus:ring-0 focus:ring-offset-0 cursor-pointer"
 								/>
-								<span>Stay signed in</span>
+								<span>Remember password</span>
 							</label>
 							<span class="text-[var(--text-mute)] text-[11px] font-mono">256-bit encrypted</span>
 						</div>
@@ -255,7 +278,7 @@
 				<!-- Role Hierarchy Box (Sharp rounded-lg) -->
 				<div class="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-xs text-[var(--text-mute)] text-center space-y-1">
 					<div class="text-[var(--text-sub)] font-medium text-[11px]">Role Hierarchy Supported</div>
-					<div class="font-mono text-[11px]">Super Admin • Company Admin • HR Manager • Employee</div>
+					<div class="font-mono text-[11px]">Company Admin • HR Manager • Employee</div>
 				</div>
 			{/if}
 		</div>
