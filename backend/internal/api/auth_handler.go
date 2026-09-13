@@ -82,6 +82,9 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 
 // Login handles POST /api/v1/auth/login
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+	// Enforce 1MB request body limit to prevent memory exhaustion DoS
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	var req domain.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, http.StatusBadRequest, "invalid request body")
@@ -152,6 +155,7 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	// Fallback to Authorization header or JSON body
 	if refreshTokenStr == "" {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 		var req struct {
 			RefreshToken string `json:"refresh_token"`
 		}
@@ -173,6 +177,13 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	user, err := h.userRepo.GetUserByID(r.Context(), claims.UserID)
 	if err != nil {
 		RespondError(w, http.StatusUnauthorized, "user account not found")
+		return
+	}
+
+	// OWASP A07: Session revocation check via token_version
+	if claims.TokenVersion != user.TokenVersion {
+		h.clearAuthCookies(w)
+		RespondError(w, http.StatusUnauthorized, "session has been revoked, please sign in again")
 		return
 	}
 
@@ -202,6 +213,26 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 // Logout handles POST /api/v1/auth/logout
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	// Invalidate session by incrementing user's token_version in DB
+	var userID string
+	if claims := auth.GetClaims(r.Context()); claims != nil {
+		userID = claims.UserID
+	} else if cookie, err := r.Cookie("refresh_token"); err == nil && cookie.Value != "" {
+		if c, err := h.jwtMgr.ValidateToken(cookie.Value, "refresh"); err == nil {
+			userID = c.UserID
+		}
+	} else if cookie, err := r.Cookie("access_token"); err == nil && cookie.Value != "" {
+		if c, err := h.jwtMgr.ValidateToken(cookie.Value, "access"); err == nil {
+			userID = c.UserID
+		}
+	}
+
+	if userID != "" {
+		if err := h.userRepo.IncrementTokenVersion(r.Context(), userID); err != nil {
+			log.Printf("increment token_version on logout error for %s: %v", userID, err)
+		}
+	}
+
 	h.clearAuthCookies(w)
 	RespondOK(w, http.StatusOK, map[string]string{"status": "logged out"})
 }

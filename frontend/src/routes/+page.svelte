@@ -15,7 +15,7 @@
 
 	let email = $state('');
 	let password = $state('');
-	let rememberPassword = $state(false);
+	let rememberEmail = $state(false);
 	let isLoading = $state(false);
 	let errorMessage = $state('');
 
@@ -23,12 +23,13 @@
 
 	$effect(() => {
 		if (typeof window !== 'undefined') {
+			// Security wipe: remove any legacy plaintext password key immediately
+			localStorage.removeItem('sushi_remember_password');
+
 			const savedEmail = localStorage.getItem('sushi_remember_email');
-			const savedPass = localStorage.getItem('sushi_remember_password');
-			if (savedEmail && savedPass) {
+			if (savedEmail) {
 				email = savedEmail;
-				password = savedPass;
-				rememberPassword = true;
+				rememberEmail = true;
 			}
 		}
 	});
@@ -40,13 +41,12 @@
 
 		try {
 			if (typeof window !== 'undefined') {
-				if (rememberPassword) {
+				if (rememberEmail) {
 					localStorage.setItem('sushi_remember_email', email);
-					localStorage.setItem('sushi_remember_password', password);
 				} else {
 					localStorage.removeItem('sushi_remember_email');
-					localStorage.removeItem('sushi_remember_password');
 				}
+				localStorage.removeItem('sushi_remember_password');
 			}
 			await login(email, password);
 			await invalidateAll();
@@ -244,17 +244,17 @@
 							/>
 						</div>
 
-						<!-- Remember Password & Security Meta -->
+						<!-- Remember Email & Security Meta -->
 						<div class="flex items-center justify-between text-xs text-[var(--text-sub)] pt-1">
 							<label class="flex items-center gap-2 cursor-pointer select-none">
 								<input
 									type="checkbox"
-									bind:checked={rememberPassword}
+									bind:checked={rememberEmail}
 									class="rounded bg-[var(--surface-raised)] border-[var(--border)] text-[#f97040] focus:ring-0 focus:ring-offset-0 cursor-pointer"
 								/>
-								<span>Remember password</span>
+								<span>Remember email</span>
 							</label>
-							<span class="text-[var(--text-mute)] text-[11px] font-mono">256-bit encrypted</span>
+							<span class="text-[var(--text-mute)] text-[11px] font-mono">TLS 1.3 secured</span>
 						</div>
 
 						<!-- Reusable Flat Submit Button -->

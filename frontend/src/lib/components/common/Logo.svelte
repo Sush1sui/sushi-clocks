@@ -3,10 +3,12 @@
 
 	let {
 		size = 'md',
+		variant = 'outline',
 		showSubtitle = true,
 		class: className = ''
 	}: {
 		size?: 'sm' | 'md' | 'lg';
+		variant?: 'outline' | 'filled';
 		showSubtitle?: boolean;
 		class?: string;
 	} = $props();
@@ -19,7 +21,11 @@
 </script>
 
 <div class="flex items-center gap-3 {className}">
-	<div class="{sizeClasses[size].icon} bg-[#f97040] flex items-center justify-center shadow-sm shrink-0">
+	<div
+		class="{sizeClasses[size].icon} {variant === 'outline'
+			? 'border border-[#f97040]/40 bg-transparent'
+			: 'bg-[#f97040]'} flex items-center justify-center shrink-0"
+	>
 		<img src={sushiLogo} alt="Sushi Clocks Mascot" class="w-full h-full object-contain select-none" />
 	</div>
 	<div>

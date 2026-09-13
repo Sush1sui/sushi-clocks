@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,12 +26,42 @@ type HealthResponse struct {
 	Database string `json:"database"`
 }
 
-func corsMiddleware(allowedOrigin string, next http.Handler) http.Handler {
+func securityHeadersMiddleware(isProduction bool, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+		// OWASP A05: Security response headers
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		if isProduction {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func corsMiddleware(allowedOriginsStr string, next http.Handler) http.Handler {
+	rawOrigins := strings.Split(allowedOriginsStr, ",")
+	allowedMap := make(map[string]bool)
+	for _, o := range rawOrigins {
+		trimmed := strings.TrimSpace(o)
+		if trimmed != "" {
+			allowedMap[trimmed] = true
+		}
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if allowedMap[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+		} else if len(allowedMap) == 0 {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
@@ -90,8 +121,9 @@ func main() {
 			authHandler := api.NewAuthHandler(cfg, userRepo, jwtMgr)
 			companyHandler := api.NewCompanyHandler(companyRepo)
 			timesheetHandler := api.NewTimesheetHandler(timesheetRepo)
+			userHandler := api.NewUserHandler(userRepo)
 
-			rateLimiter := api.NewIPRateLimiter(5.0, 15.0) // 5 req/sec with burst 15
+			rateLimiter := api.NewIPRateLimiter(5.0, 15.0, cfg.BehindProxy) // 5 req/sec with burst 15
 
 			// Auth routes with rate limiting
 			mux.HandleFunc("POST /api/v1/auth/login", rateLimiter.Middleware(authHandler.Login))
@@ -117,6 +149,10 @@ func main() {
 			mux.Handle("POST /api/v1/timesheets/clock-out", authMiddleware(http.HandlerFunc(timesheetHandler.ClockOut)))
 			mux.Handle("GET /api/v1/timesheets/status", authMiddleware(http.HandlerFunc(timesheetHandler.GetStatus)))
 			mux.Handle("GET /api/v1/companies/{id}/attendance/summary", adminHrMiddleware(http.HandlerFunc(timesheetHandler.GetCompanySummary)))
+
+			// Tenant User Management routes
+			mux.Handle("GET /api/v1/companies/{id}/users", adminHrMiddleware(http.HandlerFunc(userHandler.GetCompanyUsers)))
+			mux.Handle("POST /api/v1/companies/{id}/users", authMiddleware(http.HandlerFunc(userHandler.CreateCompanyUser)))
 		}
 	} else {
 		log.Println("DATABASE_URL not set, database features disabled")
@@ -124,8 +160,8 @@ func main() {
 
 	mux.HandleFunc("GET /", healthHandler(dbConnected))
 
-	// Wrap entire mux with CORS
-	handler := corsMiddleware(cfg.CORSAllowedOrigins, mux)
+	// Wrap entire mux with security headers and CORS
+	handler := securityHeadersMiddleware(cfg.Environment == "production", corsMiddleware(cfg.CORSAllowedOrigins, mux))
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Port),

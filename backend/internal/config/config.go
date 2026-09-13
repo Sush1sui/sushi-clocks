@@ -17,6 +17,8 @@ type Config struct {
 	JWTAccessTTL       time.Duration
 	JWTRefreshTTL      time.Duration
 
+	BehindProxy        bool
+
 	// Super Admin Seeder configs
 	SuperAdminEmail     string
 	SuperAdminPassword  string
@@ -52,6 +54,15 @@ func Load() *Config {
 		jwtSecret = "sushi-clocks-default-development-jwt-secret-key-32b"
 	}
 
+	// OWASP A05: Fail-fast on insecure or default JWT secret in production
+	if env == "production" {
+		if jwtSecret == "" || jwtSecret == "sushi-clocks-default-development-jwt-secret-key-32b" || len(jwtSecret) < 32 {
+			log.Fatalf("FATAL SECURITY ERROR: Insecure or default JWT_SECRET configured in production environment. A minimum 32-character random key is required.")
+		}
+	}
+
+	behindProxy := os.Getenv("BEHIND_PROXY") == "true" || env == "production"
+
 	jwtAccessTTLStr := os.Getenv("JWT_ACCESS_TTL")
 	jwtAccessTTL, err := time.ParseDuration(jwtAccessTTLStr)
 	if err != nil || jwtAccessTTL == 0 {
@@ -72,6 +83,7 @@ func Load() *Config {
 		JWTSecret:           jwtSecret,
 		JWTAccessTTL:        jwtAccessTTL,
 		JWTRefreshTTL:       jwtRefreshTTL,
+		BehindProxy:         behindProxy,
 		SuperAdminEmail:     os.Getenv("SUPER_ADMIN_EMAIL"),
 		SuperAdminPassword:  os.Getenv("SUPER_ADMIN_PASSWORD"),
 		SuperAdminFirstName: os.Getenv("SUPER_ADMIN_FIRST_NAME"),

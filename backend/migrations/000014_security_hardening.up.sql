@@ -1,0 +1,3 @@
+ALTER TABLE users DROP CONSTRAINT IF EXISTS uq_users_company_email;
+ALTER TABLE users ADD CONSTRAINT uq_users_email UNIQUE (email);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;

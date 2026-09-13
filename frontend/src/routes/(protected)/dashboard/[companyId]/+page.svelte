@@ -35,8 +35,10 @@
 	import ThemeToggle from '$lib/components/common/ThemeToggle.svelte';
 	import StatusBadge from '$lib/components/common/StatusBadge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
+	import StaffDrawer from '$lib/components/staff/StaffDrawer.svelte';
 
 	let isLoggingOut = $state(false);
+	let staffDrawerOpen = $state(false);
 
 	const user = $derived(page.data.user);
 	const company = $derived(page.data.company as Company);
@@ -407,6 +409,7 @@
 							<!-- Users & Staff -->
 							<button
 								type="button"
+								onclick={() => (staffDrawerOpen = true)}
 								class="p-3.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] hover:border-[#f97040]/50 transition-colors text-left group cursor-pointer"
 							>
 								<div class="flex items-start justify-between">
@@ -500,4 +503,11 @@
 		</div>
 
 	</main>
+
+	<!-- Staff Management Drawer — renders as a portal overlay -->
+	<StaffDrawer
+		bind:open={staffDrawerOpen}
+		companyId={company?.id ?? ''}
+		role={user?.system_role ?? ''}
+	/>
 </div>

@@ -32,11 +32,12 @@ func NewJWTManager(secret string, accessTTL, refreshTTL time.Duration) *JWTManag
 func (m *JWTManager) GenerateAccessToken(user *domain.User) (string, int64, error) {
 	expiresAt := time.Now().Add(m.accessTTL)
 	claims := &domain.JWTClaims{
-		UserID:     user.ID,
-		CompanyID:  user.CompanyID,
-		Email:      user.Email,
-		SystemRole: user.SystemRole,
-		TokenType:  "access",
+		UserID:       user.ID,
+		CompanyID:    user.CompanyID,
+		Email:        user.Email,
+		SystemRole:   user.SystemRole,
+		TokenType:    "access",
+		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -56,11 +57,12 @@ func (m *JWTManager) GenerateAccessToken(user *domain.User) (string, int64, erro
 func (m *JWTManager) GenerateRefreshToken(user *domain.User) (string, int64, error) {
 	expiresAt := time.Now().Add(m.refreshTTL)
 	claims := &domain.JWTClaims{
-		UserID:     user.ID,
-		CompanyID:  user.CompanyID,
-		Email:      user.Email,
-		SystemRole: user.SystemRole,
-		TokenType:  "refresh",
+		UserID:       user.ID,
+		CompanyID:    user.CompanyID,
+		Email:        user.Email,
+		SystemRole:   user.SystemRole,
+		TokenType:    "refresh",
+		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.ID,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

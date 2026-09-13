@@ -1,7 +1,8 @@
 import type { Handle } from '@sveltejs/kit';
 import type { User } from './app';
+import { env } from '$env/dynamic/private';
 
-const BACKEND_URL = 'http://localhost:8080';
+const BACKEND_URL = env.BACKEND_URL ?? 'http://localhost:8080';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	event.locals.user = null;

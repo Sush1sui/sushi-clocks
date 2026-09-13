@@ -22,6 +22,7 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	MobileNumber *string   `json:"mobile_number,omitempty"`
 	SystemRole   string    `json:"system_role"`
+	TokenVersion int       `json:"-"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
@@ -57,6 +58,17 @@ func (u *User) ToResponse() UserResponse {
 	}
 }
 
+// CreateStaffRequest is the payload for Admin creating a new HR or Employee account.
+// SystemRole must be "hr" or "employee" — handler rejects any escalation attempt.
+type CreateStaffRequest struct {
+	FirstName    string  `json:"first_name"`
+	LastName     string  `json:"last_name"`
+	Email        string  `json:"email"`
+	Password     string  `json:"password"`
+	MobileNumber *string `json:"mobile_number,omitempty"`
+	SystemRole   string  `json:"system_role"` // only "hr" or "employee" allowed
+}
+
 type LoginRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -74,10 +86,11 @@ type RefreshTokenResponse struct {
 }
 
 type JWTClaims struct {
-	UserID     string `json:"user_id"`
-	CompanyID  string `json:"company_id"`
-	Email      string `json:"email"`
-	SystemRole string `json:"system_role"`
-	TokenType  string `json:"token_type"` // "access" or "refresh"
+	UserID       string `json:"user_id"`
+	CompanyID    string `json:"company_id"`
+	Email        string `json:"email"`
+	SystemRole   string `json:"system_role"`
+	TokenType    string `json:"token_type"` // "access" or "refresh"
+	TokenVersion int    `json:"token_version"`
 	jwt.RegisteredClaims
 }

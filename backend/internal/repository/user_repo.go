@@ -24,7 +24,7 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, created_at
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
 		FROM users
 		WHERE email = $1
 		LIMIT 1
@@ -39,6 +39,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 		&u.PasswordHash,
 		&u.MobileNumber,
 		&u.SystemRole,
+		&u.TokenVersion,
 		&u.CreatedAt,
 	)
 	if err != nil {
@@ -52,7 +53,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
 	query := `
-		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, created_at
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
 		FROM users
 		WHERE id = $1
 	`
@@ -66,6 +67,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id string) (*domain.Us
 		&u.PasswordHash,
 		&u.MobileNumber,
 		&u.SystemRole,
+		&u.TokenVersion,
 		&u.CreatedAt,
 	)
 	if err != nil {
@@ -77,11 +79,27 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id string) (*domain.Us
 	return &u, nil
 }
 
+func (r *UserRepository) IncrementTokenVersion(ctx context.Context, userID string) error {
+	query := `
+		UPDATE users
+		SET token_version = token_version + 1
+		WHERE id = $1
+	`
+	tag, err := r.pool.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("increment token_version error: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *UserRepository) CreateUser(ctx context.Context, u *domain.User) error {
 	query := `
 		INSERT INTO users (company_id, first_name, last_name, email, password_hash, mobile_number, system_role)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING id, created_at
+		RETURNING id, token_version, created_at
 	`
 	err := r.pool.QueryRow(ctx, query,
 		u.CompanyID,
@@ -91,7 +109,7 @@ func (r *UserRepository) CreateUser(ctx context.Context, u *domain.User) error {
 		u.PasswordHash,
 		u.MobileNumber,
 		u.SystemRole,
-	).Scan(&u.ID, &u.CreatedAt)
+	).Scan(&u.ID, &u.TokenVersion, &u.CreatedAt)
 
 	if err != nil {
 		return fmt.Errorf("insert user error: %w", err)
@@ -140,3 +158,64 @@ func (r *UserRepository) CreateCompany(ctx context.Context, c *domain.Company) e
 	}
 	return nil
 }
+
+// GetUsersByCompanyID returns all non-super-admin users in a tenant company.
+func (r *UserRepository) GetUsersByCompanyID(ctx context.Context, companyID string) ([]domain.User, error) {
+	query := `
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
+		FROM users
+		WHERE company_id = $1 AND system_role != 'super_admin'
+		ORDER BY created_at ASC
+	`
+	rows, err := r.pool.Query(ctx, query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("query users by company error: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]domain.User, 0)
+	for rows.Next() {
+		var u domain.User
+		if err := rows.Scan(
+			&u.ID,
+			&u.CompanyID,
+			&u.FirstName,
+			&u.LastName,
+			&u.Email,
+			&u.PasswordHash,
+			&u.MobileNumber,
+			&u.SystemRole,
+			&u.TokenVersion,
+			&u.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan user error: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+// CreateCompanyUser inserts a new HR or Employee user. The caller MUST set u.CompanyID
+// from the authenticated JWT claims — never from the request body.
+func (r *UserRepository) CreateCompanyUser(ctx context.Context, u *domain.User) error {
+	query := `
+		INSERT INTO users (company_id, first_name, last_name, email, password_hash, mobile_number, system_role)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, token_version, created_at
+	`
+	err := r.pool.QueryRow(ctx, query,
+		u.CompanyID,
+		u.FirstName,
+		u.LastName,
+		u.Email,
+		u.PasswordHash,
+		u.MobileNumber,
+		u.SystemRole,
+	).Scan(&u.ID, &u.TokenVersion, &u.CreatedAt)
+
+	if err != nil {
+		return fmt.Errorf("insert company user error: %w", err)
+	}
+	return nil
+}
+

@@ -37,6 +37,8 @@ func (h *CompanyHandler) GetCompanies(w http.ResponseWriter, r *http.Request) {
 
 // CreateCompany handles POST /api/v1/companies (Super Admin Only)
 func (h *CompanyHandler) CreateCompany(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
 	var req domain.CreateCompanyRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		RespondError(w, http.StatusBadRequest, "invalid request body")

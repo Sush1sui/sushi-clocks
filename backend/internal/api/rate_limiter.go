@@ -15,17 +15,19 @@ type clientBucket struct {
 }
 
 type IPRateLimiter struct {
-	rate       float64 // tokens per second
-	capacity   float64 // max burst capacity
-	clients    sync.Map
-	stopSweep  chan struct{}
+	rate        float64 // tokens per second
+	capacity    float64 // max burst capacity
+	behindProxy bool
+	clients     sync.Map
+	stopSweep   chan struct{}
 }
 
-func NewIPRateLimiter(rate float64, capacity float64) *IPRateLimiter {
+func NewIPRateLimiter(rate float64, capacity float64, behindProxy bool) *IPRateLimiter {
 	limiter := &IPRateLimiter{
-		rate:      rate,
-		capacity:  capacity,
-		stopSweep: make(chan struct{}),
+		rate:        rate,
+		capacity:    capacity,
+		behindProxy: behindProxy,
+		stopSweep:   make(chan struct{}),
 	}
 
 	// Periodic cleanup of stale IPs every 10 minutes
@@ -55,12 +57,14 @@ func NewIPRateLimiter(rate float64, capacity float64) *IPRateLimiter {
 }
 
 func (l *IPRateLimiter) getIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
-		return strings.TrimSpace(xrip)
+	if l.behindProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			parts := strings.Split(xff, ",")
+			return strings.TrimSpace(parts[0])
+		}
+		if xrip := r.Header.Get("X-Real-IP"); xrip != "" {
+			return strings.TrimSpace(xrip)
+		}
 	}
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
