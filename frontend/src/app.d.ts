@@ -17,6 +17,7 @@ declare global {
 		// interface Error {}
 		interface Locals {
 			user: User | null;
+			accessToken: string | null;
 		}
 		interface PageData {
 			user: User | null;

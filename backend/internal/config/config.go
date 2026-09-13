@@ -19,6 +19,10 @@ type Config struct {
 
 	BehindProxy        bool
 
+	// MongoDB Telemetry & Audits (Atlas Free Tier)
+	MongoURI     string
+	MongoDBName  string
+
 	// Super Admin Seeder configs
 	SuperAdminEmail     string
 	SuperAdminPassword  string
@@ -75,6 +79,11 @@ func Load() *Config {
 		jwtRefreshTTL = 7 * 24 * time.Hour
 	}
 
+	mongoDBName := os.Getenv("MONGO_DB_NAME")
+	if mongoDBName == "" {
+		mongoDBName = "sushi_clocks"
+	}
+
 	return &Config{
 		Port:                port,
 		Environment:         env,
@@ -84,6 +93,8 @@ func Load() *Config {
 		JWTAccessTTL:        jwtAccessTTL,
 		JWTRefreshTTL:       jwtRefreshTTL,
 		BehindProxy:         behindProxy,
+		MongoURI:            os.Getenv("MONGO_URI"),
+		MongoDBName:         mongoDBName,
 		SuperAdminEmail:     os.Getenv("SUPER_ADMIN_EMAIL"),
 		SuperAdminPassword:  os.Getenv("SUPER_ADMIN_PASSWORD"),
 		SuperAdminFirstName: os.Getenv("SUPER_ADMIN_FIRST_NAME"),

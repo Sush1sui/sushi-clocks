@@ -2,10 +2,11 @@ import { redirect, error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { Company } from '$lib/api/companies';
 import type { TimesheetStatusResponse, AttendanceSummary } from '$lib/api/timesheets';
+import { env } from '$env/dynamic/private';
 
-const BACKEND_URL = 'http://localhost:8080';
+const BACKEND_URL = env.BACKEND_URL ?? 'http://localhost:8080';
 
-export const load: PageServerLoad = async ({ locals, params, request }) => {
+export const load: PageServerLoad = async ({ locals, params, cookies }) => {
 	if (!locals.user) {
 		throw redirect(303, '/');
 	}
@@ -18,8 +19,17 @@ export const load: PageServerLoad = async ({ locals, params, request }) => {
 		throw redirect(303, `/dashboard/${locals.user.company_id}`);
 	}
 
-	const cookieHeader = request.headers.get('cookie') || '';
-	const headers = { cookie: cookieHeader };
+	// Always use fresh active token from locals (freshly refreshed by hooks if expired)
+	const token = locals.accessToken || cookies.get('access_token');
+	const cookieStr = cookies
+		.getAll()
+		.map((c) => `${c.name}=${c.value}`)
+		.join('; ');
+
+	const headers: HeadersInit = {
+		...(cookieStr ? { cookie: cookieStr } : {}),
+		...(token ? { Authorization: `Bearer ${token}` } : {})
+	};
 
 	let company: Company | null = null;
 	try {
@@ -34,6 +44,8 @@ export const load: PageServerLoad = async ({ locals, params, request }) => {
 			throw error(404, 'Organization not found');
 		} else if (res.status === 403) {
 			throw redirect(303, `/dashboard/${locals.user.company_id}`);
+		} else if (res.status === 401) {
+			throw redirect(303, '/');
 		}
 	} catch (err: unknown) {
 		if (err && typeof err === 'object' && 'status' in err) {

@@ -18,6 +18,7 @@ import (
 	"github.com/sushi-clocks/backend/internal/db"
 	"github.com/sushi-clocks/backend/internal/domain"
 	"github.com/sushi-clocks/backend/internal/repository"
+	"github.com/sushi-clocks/backend/internal/sse"
 )
 
 type HealthResponse struct {
@@ -118,9 +119,30 @@ func main() {
 			companyRepo := repository.NewCompanyRepository(pool)
 			timesheetRepo := repository.NewTimesheetRepository(pool)
 
+			// SSE Real-Time Presence Hub
+			sseHub := sse.NewHub()
+			sseHandler := api.NewSSEHandler(sseHub)
+
+			// MongoDB Atlas Telemetry & Audit Logs (Free Tier)
+			var telemetryRepo *repository.TelemetryRepository
+			var auditRepo *repository.AuditRepository
+			if cfg.MongoURI != "" {
+				mongoClient, err := db.NewMongoClient(ctx, cfg.MongoURI)
+				if err != nil {
+					log.Printf("warning: mongo connection failed: %v", err)
+				} else {
+					defer func() { _ = mongoClient.Disconnect(context.Background()) }()
+					log.Println("connected to MongoDB Atlas successfully")
+					mongoDB := mongoClient.Database(cfg.MongoDBName)
+					telemetryRepo = repository.NewTelemetryRepository(mongoDB)
+					auditRepo = repository.NewAuditRepository(mongoDB)
+				}
+			}
+
 			authHandler := api.NewAuthHandler(cfg, userRepo, jwtMgr)
 			companyHandler := api.NewCompanyHandler(companyRepo)
-			timesheetHandler := api.NewTimesheetHandler(timesheetRepo)
+			timesheetHandler := api.NewTimesheetHandler(timesheetRepo, telemetryRepo, sseHub, cfg.BehindProxy)
+			adjustmentHandler := api.NewAdjustmentHandler(timesheetRepo, auditRepo, sseHub)
 			userHandler := api.NewUserHandler(userRepo)
 
 			rateLimiter := api.NewIPRateLimiter(5.0, 15.0, cfg.BehindProxy) // 5 req/sec with burst 15
@@ -137,6 +159,9 @@ func main() {
 
 			mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 
+			// Real-time SSE event stream
+			mux.Handle("GET /api/v1/events", authMiddleware(http.HandlerFunc(sseHandler.Subscribe)))
+
 			// Super Admin Company Management routes
 			mux.Handle("GET /api/v1/companies", superAdminMiddleware(http.HandlerFunc(companyHandler.GetCompanies)))
 			mux.Handle("POST /api/v1/companies", superAdminMiddleware(http.HandlerFunc(companyHandler.CreateCompany)))
@@ -148,7 +173,15 @@ func main() {
 			mux.Handle("POST /api/v1/timesheets/clock-in", authMiddleware(http.HandlerFunc(timesheetHandler.ClockIn)))
 			mux.Handle("POST /api/v1/timesheets/clock-out", authMiddleware(http.HandlerFunc(timesheetHandler.ClockOut)))
 			mux.Handle("GET /api/v1/timesheets/status", authMiddleware(http.HandlerFunc(timesheetHandler.GetStatus)))
+			mux.Handle("GET /api/v1/timesheets/history", authMiddleware(http.HandlerFunc(timesheetHandler.GetShiftHistory)))
 			mux.Handle("GET /api/v1/companies/{id}/attendance/summary", adminHrMiddleware(http.HandlerFunc(timesheetHandler.GetCompanySummary)))
+			mux.Handle("GET /api/v1/companies/{id}/attendance/roster", adminHrMiddleware(http.HandlerFunc(timesheetHandler.GetLiveRoster)))
+
+			// Attendance Adjustments & Audit routes
+			mux.Handle("POST /api/v1/timesheets/{id}/adjustment-request", authMiddleware(http.HandlerFunc(adjustmentHandler.RequestAdjustment)))
+			mux.Handle("GET /api/v1/companies/{id}/adjustments", adminHrMiddleware(http.HandlerFunc(adjustmentHandler.GetCompanyAdjustments)))
+			mux.Handle("PATCH /api/v1/timesheets/adjustments/{id}", adminHrMiddleware(http.HandlerFunc(adjustmentHandler.ResolveAdjustment)))
+			mux.Handle("PUT /api/v1/timesheets/{id}", adminHrMiddleware(http.HandlerFunc(adjustmentHandler.DirectOverride)))
 
 			// Tenant User Management routes
 			mux.Handle("GET /api/v1/companies/{id}/users", adminHrMiddleware(http.HandlerFunc(userHandler.GetCompanyUsers)))

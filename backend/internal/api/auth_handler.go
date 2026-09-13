@@ -32,11 +32,11 @@ func NewAuthHandler(cfg *config.Config, userRepo *repository.UserRepository, jwt
 func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken string, accessTTL int64, refreshToken string, refreshTTL int64) {
 	isSecure := h.cfg.Environment == "production"
 
-	// Refresh token cookie — restricted to /api/v1/auth
+	// Refresh token cookie — available across entire domain for SSR session persistence
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
-		Path:     "/api/v1/auth",
+		Path:     "/",
 		MaxAge:   int(refreshTTL),
 		HttpOnly: true,
 		Secure:   isSecure,
@@ -59,6 +59,18 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken string, 
 func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 	isSecure := h.cfg.Environment == "production"
 
+	// Clear root path refresh_token
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   isSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Also clear legacy /api/v1/auth path cookie if present
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",

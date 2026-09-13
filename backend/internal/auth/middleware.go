@@ -48,6 +48,11 @@ func ExtractToken(r *http.Request) string {
 		return cookie.Value
 	}
 
+	// Fallback to query param (e.g. for EventSource / SSE)
+	if token := r.URL.Query().Get("token"); token != "" {
+		return token
+	}
+
 	return ""
 }
 

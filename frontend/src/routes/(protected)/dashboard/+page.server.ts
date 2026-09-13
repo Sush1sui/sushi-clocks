@@ -1,10 +1,11 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { CompanyWithStats } from '$lib/api/companies';
+import { env } from '$env/dynamic/private';
 
-const BACKEND_URL = 'http://localhost:8080';
+const BACKEND_URL = env.BACKEND_URL ?? 'http://localhost:8080';
 
-export const load: PageServerLoad = async ({ locals, request }) => {
+export const load: PageServerLoad = async ({ locals, cookies }) => {
 	if (!locals.user) {
 		throw redirect(303, '/');
 	}
@@ -14,14 +15,20 @@ export const load: PageServerLoad = async ({ locals, request }) => {
 		throw redirect(303, `/dashboard/${locals.user.company_id}`);
 	}
 
+	const token = locals.accessToken || cookies.get('access_token');
+	const cookieStr = cookies
+		.getAll()
+		.map((c) => `${c.name}=${c.value}`)
+		.join('; ');
+
+	const headers: HeadersInit = {
+		...(cookieStr ? { cookie: cookieStr } : {}),
+		...(token ? { Authorization: `Bearer ${token}` } : {})
+	};
+
 	let companies: CompanyWithStats[] = [];
 	try {
-		const cookieHeader = request.headers.get('cookie') || '';
-		const res = await fetch(`${BACKEND_URL}/api/v1/companies`, {
-			headers: {
-				cookie: cookieHeader
-			}
-		});
+		const res = await fetch(`${BACKEND_URL}/api/v1/companies`, { headers });
 
 		if (res.ok) {
 			const json = await res.json();

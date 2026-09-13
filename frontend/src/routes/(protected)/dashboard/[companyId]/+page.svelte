@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import { page } from '$app/state';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { logout } from '$lib/api/auth';
@@ -10,6 +11,7 @@
 		type Timesheet,
 		type AttendanceSummary
 	} from '$lib/api/timesheets';
+	import { createSSEConnection } from '$lib/sse/client';
 	import sushiLogo from '$lib/assets/sushi_logo_without_bg.png';
 	import {
 		Building2,
@@ -28,7 +30,8 @@
 		Send,
 		SlidersHorizontal,
 		ChevronRight,
-		AlertCircle
+		AlertCircle,
+		Radio
 	} from '@lucide/svelte';
 
 	import Logo from '$lib/components/common/Logo.svelte';
@@ -36,9 +39,18 @@
 	import StatusBadge from '$lib/components/common/StatusBadge.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import StaffDrawer from '$lib/components/staff/StaffDrawer.svelte';
+	import LiveRoster from '$lib/components/attendance/LiveRoster.svelte';
+	import ShiftHistory from '$lib/components/attendance/ShiftHistory.svelte';
+	import AdjustmentQueue from '$lib/components/attendance/AdjustmentQueue.svelte';
 
 	let isLoggingOut = $state(false);
 	let staffDrawerOpen = $state(false);
+
+	let liveRosterRef = $state<any>(null);
+	let shiftHistoryRef = $state<any>(null);
+	let adjustmentQueueRef = $state<any>(null);
+	let sseConnected = $state(false);
+	let sseDisconnect: (() => void) | null = null;
 
 	const user = $derived(page.data.user);
 	const company = $derived(page.data.company as Company);
@@ -67,6 +79,41 @@
 	$effect(() => {
 		if (initialSummary !== undefined) {
 			attendanceSummary = initialSummary || null;
+		}
+	});
+
+	onMount(() => {
+		if (company?.id) {
+			sseDisconnect = createSSEConnection(company.id, (eventType, data) => {
+				if (eventType === 'connected') {
+					sseConnected = true;
+				} else if (eventType === 'punch') {
+					refreshAttendance();
+					if ((isCompanyAdmin || isHR || isSuperAdminInspecting) && liveRosterRef?.loadRoster) {
+						liveRosterRef.loadRoster();
+					}
+					if (shiftHistoryRef?.loadHistory) shiftHistoryRef.loadHistory();
+					if (data.user_id === user?.id) {
+						if (data.action === 'clock_in') {
+							activeShift = data.timesheet;
+						} else if (data.action === 'clock_out') {
+							activeShift = null;
+						}
+					}
+				} else if (eventType === 'adjustment_request' || eventType === 'adjustment_resolved' || eventType === 'timesheet_updated') {
+					if ((isCompanyAdmin || isHR || isSuperAdminInspecting) && adjustmentQueueRef?.loadAdjustments) {
+						adjustmentQueueRef.loadAdjustments();
+					}
+					if (shiftHistoryRef?.loadHistory) shiftHistoryRef.loadHistory();
+				}
+			});
+		}
+	});
+
+	onDestroy(() => {
+		if (sseDisconnect) {
+			sseDisconnect();
+			sseDisconnect = null;
 		}
 	});
 
@@ -206,7 +253,10 @@
 			</div>
 
 			<div class="flex items-center gap-2.5">
-				<StatusBadge label="Live Sync" dotColor="emerald" />
+				<StatusBadge
+					label={sseConnected ? 'Live Sync Active' : 'Connecting...'}
+					dotColor={sseConnected ? 'emerald' : 'amber'}
+				/>
 				<ThemeToggle />
 				<Button
 					variant="ghost"
@@ -387,9 +437,22 @@
 					</Button>
 				</div>
 
+				<!-- Employee Attendance & Work Policies Guide (Left Column) -->
+				{#if !isCompanyAdmin && !isHR && !isSuperAdminInspecting}
+					<div class="p-5 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-3 shadow-sm">
+						<h3 class="text-xs font-bold tracking-tight text-[var(--text-main)]">Attendance & Work Policies</h3>
+						<ul class="text-xs text-[var(--text-sub)] space-y-2 list-disc list-inside">
+							<li>Clock in at shift commencement and clock out upon departure.</li>
+							<li>If you missed a punch, use the <strong>Adjust</strong> action in your Shift History to submit an adjustment request to HR.</li>
+							<li>Leave requests should be filed at least 3 business days in advance.</li>
+							<li>All punches and adjustments are cryptographically tracked in compliance with audit regulations.</li>
+						</ul>
+					</div>
+				{/if}
+
 			</div>
 
-			<!-- Right Column: Operational Quick Access (For Admin & HR) -->
+			<!-- Right Column: Operational Quick Access (For Admin & HR) or Shift History (For Employee) -->
 			<div class="lg:col-span-7 space-y-4">
 				
 				{#if isCompanyAdmin || isHR || isSuperAdminInspecting}
@@ -422,9 +485,10 @@
 								<div class="text-[11px] text-[var(--text-sub)] mt-0.5">Manage employee accounts and roles.</div>
 							</button>
 
-							<!-- Live Attendance -->
+							<!-- Live Attendance Roster Trigger -->
 							<button
 								type="button"
+								onclick={() => { liveRosterRef?.loadRoster?.(); }}
 								class="p-3.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] hover:border-[#f97040]/50 transition-colors text-left group cursor-pointer"
 							>
 								<div class="flex items-start justify-between">
@@ -434,7 +498,7 @@
 									<ChevronRight class="w-3.5 h-3.5 text-[var(--text-mute)] group-hover:text-[var(--text-main)] transition-colors" />
 								</div>
 								<div class="text-xs font-semibold text-[var(--text-main)]">Live Attendance</div>
-								<div class="text-[11px] text-[var(--text-sub)] mt-0.5">View active shifts and timestamps.</div>
+								<div class="text-[11px] text-[var(--text-sub)] mt-0.5">SSE live roster streamed below.</div>
 							</button>
 
 							<!-- Leave Requests -->
@@ -484,17 +548,26 @@
 
 					</div>
 
+					<!-- Real-Time SSE Presence: Live Roster Table -->
+					<LiveRoster bind:this={liveRosterRef} companyId={company?.id ?? ''} />
+
+					<!-- Audit Ledger & Adjustment Review Queue -->
+					<AdjustmentQueue
+						bind:this={adjustmentQueueRef}
+						companyId={company?.id ?? ''}
+						onResolved={() => {
+							refreshAttendance();
+							if (shiftHistoryRef?.loadHistory) shiftHistoryRef.loadHistory();
+						}}
+					/>
+
+					<!-- Admin Personal Shift History -->
+					<ShiftHistory bind:this={shiftHistoryRef} />
+
 				{:else}
 					
-					<!-- Employee Info / Tips Card (When logged in as Employee) -->
-					<div class="p-5 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-3 shadow-sm">
-						<h3 class="text-xs font-bold tracking-tight text-[var(--text-main)]">Quick Tips</h3>
-						<ul class="text-xs text-[var(--text-sub)] space-y-2 list-disc list-inside">
-							<li>Remember to clock in at the start of your shift and clock out before leaving.</li>
-							<li>Leave requests should be submitted at least 3 business days in advance.</li>
-							<li>Your attendance and hours will automatically be reflected in monthly payroll reports.</li>
-						</ul>
-					</div>
+					<!-- Employee View: Shift History takes prominent right column with zero clipping -->
+					<ShiftHistory bind:this={shiftHistoryRef} />
 
 				{/if}
 
