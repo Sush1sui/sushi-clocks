@@ -27,11 +27,13 @@ type User struct {
 }
 
 type Company struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	CurrencyCode string    `json:"currency_code"`
-	Timezone     string    `json:"timezone"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	CurrencyCode  string    `json:"currency_code"`
+	Timezone      string    `json:"timezone"`
+	ProrationType string    `json:"proration_basis"`
+	WorkDaysMask  int       `json:"work_days_mask"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type UserResponse struct {

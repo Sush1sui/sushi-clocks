@@ -69,7 +69,7 @@ func (r *CompanyRepository) GetAllCompaniesWithStats(ctx context.Context) ([]dom
 
 func (r *CompanyRepository) GetCompanyByID(ctx context.Context, id string) (*domain.Company, error) {
 	query := `
-		SELECT id, name, currency_code, timezone, created_at
+		SELECT id, name, currency_code, timezone, proration_basis, work_days_mask, created_at
 		FROM companies
 		WHERE id = $1
 		LIMIT 1
@@ -80,6 +80,8 @@ func (r *CompanyRepository) GetCompanyByID(ctx context.Context, id string) (*dom
 		&c.Name,
 		&c.CurrencyCode,
 		&c.Timezone,
+		&c.ProrationType,
+		&c.WorkDaysMask,
 		&c.CreatedAt,
 	)
 	if err != nil {

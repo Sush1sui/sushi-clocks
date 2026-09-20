@@ -92,9 +92,25 @@ export const load: PageServerLoad = async ({ locals, params, cookies }) => {
 		}
 	}
 
+	// 4. Fetch User's Leave Balances & Period
+	let leaveData: { balances: any[]; period: any } | null = null;
+	try {
+		const res = await fetch(`${BACKEND_URL}/api/v1/leave/balances`, { headers });
+		if (res.ok) {
+			const json = await res.json();
+			if (json.success && json.data) {
+				leaveData = json.data;
+			}
+		}
+	} catch (err) {
+		console.error('Failed to load leave balances:', err);
+	}
+
 	return {
 		company,
 		timesheetStatus,
-		attendanceSummary
+		attendanceSummary,
+		leaveBalances: leaveData?.balances ?? [],
+		leavePeriod: leaveData?.period ?? null
 	};
 };

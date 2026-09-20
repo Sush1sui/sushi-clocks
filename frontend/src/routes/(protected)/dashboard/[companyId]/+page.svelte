@@ -42,18 +42,30 @@
 	import LiveRoster from '$lib/components/attendance/LiveRoster.svelte';
 	import ShiftHistory from '$lib/components/attendance/ShiftHistory.svelte';
 	import AdjustmentQueue from '$lib/components/attendance/AdjustmentQueue.svelte';
+	import LeaveAllowanceCards from '$lib/components/leave/LeaveAllowanceCards.svelte';
+	import LeaveRequestModal from '$lib/components/leave/LeaveRequestModal.svelte';
+	import LeaveQueue from '$lib/components/leave/LeaveQueue.svelte';
+	import LeavePolicyModal from '$lib/components/leave/LeavePolicyModal.svelte';
+	import type { LeaveBalance, LeavePeriod } from '$lib/api/leave';
 
 	let isLoggingOut = $state(false);
 	let staffDrawerOpen = $state(false);
+	let leaveModalOpen = $state(false);
+	let policyModalOpen = $state(false);
 
 	let liveRosterRef = $state<any>(null);
 	let shiftHistoryRef = $state<any>(null);
 	let adjustmentQueueRef = $state<any>(null);
+	let leaveAllowanceRef = $state<any>(null);
+	let leaveQueueRef = $state<any>(null);
 	let sseConnected = $state(false);
 	let sseDisconnect: (() => void) | null = null;
 
 	const user = $derived(page.data.user);
 	const company = $derived(page.data.company as Company);
+
+	const initialLeaveBalances = $derived(page.data.leaveBalances as LeaveBalance[]);
+	const initialLeavePeriod = $derived(page.data.leavePeriod as LeavePeriod);
 
 	const isSuperAdminInspecting = $derived(user?.system_role === 'super_admin');
 	const isCompanyAdmin = $derived(user?.system_role === 'admin');
@@ -105,6 +117,11 @@
 						adjustmentQueueRef.loadAdjustments();
 					}
 					if (shiftHistoryRef?.loadHistory) shiftHistoryRef.loadHistory();
+				} else if (eventType === 'leave_requested' || eventType === 'leave_resolved' || eventType === 'leave_policy_updated') {
+					if (leaveAllowanceRef?.loadBalances) leaveAllowanceRef.loadBalances();
+					if ((isCompanyAdmin || isHR || isSuperAdminInspecting) && leaveQueueRef?.loadRequests) {
+						leaveQueueRef.loadRequests();
+					}
 				}
 			});
 		}
@@ -408,34 +425,15 @@
 				</div>
 
 				<!-- Leave Balances & Fast Request -->
-				<div class="p-4 rounded-xl bg-[var(--surface)] border border-[var(--border)] space-y-3 shadow-sm">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center gap-2">
-							<CalendarCheck class="w-4 h-4 text-blue-400" />
-							<h3 class="text-xs font-bold tracking-tight">Available Time Off</h3>
-						</div>
-						<span class="text-[10px] font-mono text-[var(--text-mute)]">2026 Allowance</span>
-					</div>
-
-					<div class="grid grid-cols-2 gap-2 text-xs">
-						<div class="p-2.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)]">
-							<span class="text-[10px] text-[var(--text-mute)] font-mono">Vacation</span>
-							<div class="font-display text-sm font-bold text-emerald-400 mt-0.5">12 Days</div>
-						</div>
-						<div class="p-2.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)]">
-							<span class="text-[10px] text-[var(--text-mute)] font-mono">Sick Leave</span>
-							<div class="font-display text-sm font-bold text-blue-400 mt-0.5">8 Days</div>
-						</div>
-					</div>
-
-					<Button
-						variant="secondary"
-						class="w-full h-9 text-xs"
-					>
-						<Send class="w-3.5 h-3.5 mr-1.5 text-[#f97040]" />
-						<span>Request Time Off</span>
-					</Button>
-				</div>
+				<LeaveAllowanceCards
+					bind:this={leaveAllowanceRef}
+					companyId={company?.id ?? ''}
+					initialBalances={initialLeaveBalances}
+					initialPeriod={initialLeavePeriod}
+					onRequestLeave={() => (leaveModalOpen = true)}
+					isAdmin={isCompanyAdmin || isSuperAdminInspecting}
+					onOpenPolicySettings={() => (policyModalOpen = true)}
+				/>
 
 				<!-- Employee Attendance & Work Policies Guide (Left Column) -->
 				{#if !isCompanyAdmin && !isHR && !isSuperAdminInspecting}
@@ -504,6 +502,7 @@
 							<!-- Leave Requests -->
 							<button
 								type="button"
+								onclick={() => { leaveQueueRef?.loadRequests?.(); }}
 								class="p-3.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] hover:border-[#f97040]/50 transition-colors text-left group cursor-pointer"
 							>
 								<div class="flex items-start justify-between">
@@ -540,7 +539,11 @@
 									<SlidersHorizontal class="w-3.5 h-3.5 text-[var(--text-mute)]" />
 									<span>Company Policies & Pay Rates</span>
 								</div>
-								<Button variant="ghost" class="h-7 text-xs px-2 text-[#f97040] hover:underline">
+								<Button
+									variant="ghost"
+									class="h-7 text-xs px-2 text-[#f97040] hover:underline cursor-pointer"
+									onclick={() => (policyModalOpen = true)}
+								>
 									Manage Policies →
 								</Button>
 							</div>
@@ -550,6 +553,15 @@
 
 					<!-- Real-Time SSE Presence: Live Roster Table -->
 					<LiveRoster bind:this={liveRosterRef} companyId={company?.id ?? ''} />
+
+					<!-- Leave Requests Review Queue -->
+					<LeaveQueue
+						bind:this={leaveQueueRef}
+						companyId={company?.id ?? ''}
+						onResolved={() => {
+							if (leaveAllowanceRef?.loadBalances) leaveAllowanceRef.loadBalances();
+						}}
+					/>
 
 					<!-- Audit Ledger & Adjustment Review Queue -->
 					<AdjustmentQueue
@@ -582,5 +594,24 @@
 		bind:open={staffDrawerOpen}
 		companyId={company?.id ?? ''}
 		role={user?.system_role ?? ''}
+	/>
+
+	<!-- Leave Request Interactive Modal -->
+	<LeaveRequestModal
+		bind:open={leaveModalOpen}
+		balances={initialLeaveBalances}
+		onSubmitted={() => {
+			if (leaveAllowanceRef?.loadBalances) leaveAllowanceRef.loadBalances();
+			if (leaveQueueRef?.loadRequests) leaveQueueRef.loadRequests();
+		}}
+	/>
+
+	<!-- Leave Policy Configuration Modal (Company Admin) -->
+	<LeavePolicyModal
+		bind:open={policyModalOpen}
+		companyId={company?.id ?? ''}
+		onUpdated={() => {
+			if (leaveAllowanceRef?.loadBalances) leaveAllowanceRef.loadBalances();
+		}}
 	/>
 </div>

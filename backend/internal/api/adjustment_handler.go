@@ -194,6 +194,12 @@ func (h *AdjustmentHandler) ResolveAdjustment(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// OWASP A04: Separation of duties — cannot review or resolve own timesheet adjustment
+	if existing.UserID == claims.UserID && claims.SystemRole != domain.RoleSuperAdmin {
+		RespondError(w, http.StatusForbidden, "cannot review or resolve your own timesheet adjustment")
+		return
+	}
+
 	var updated *domain.Timesheet
 	actionName := ""
 

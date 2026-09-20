@@ -118,6 +118,7 @@ func main() {
 			userRepo := repository.NewUserRepository(pool)
 			companyRepo := repository.NewCompanyRepository(pool)
 			timesheetRepo := repository.NewTimesheetRepository(pool)
+			leaveRepo := repository.NewLeaveRepository(pool)
 
 			// SSE Real-Time Presence Hub
 			sseHub := sse.NewHub()
@@ -144,6 +145,7 @@ func main() {
 			timesheetHandler := api.NewTimesheetHandler(timesheetRepo, telemetryRepo, sseHub, cfg.BehindProxy)
 			adjustmentHandler := api.NewAdjustmentHandler(timesheetRepo, auditRepo, sseHub)
 			userHandler := api.NewUserHandler(userRepo)
+			leaveHandler := api.NewLeaveHandler(leaveRepo, auditRepo, sseHub)
 
 			rateLimiter := api.NewIPRateLimiter(5.0, 15.0, cfg.BehindProxy) // 5 req/sec with burst 15
 
@@ -156,6 +158,7 @@ func main() {
 			authMiddleware := auth.RequireAuth(jwtMgr)
 			superAdminMiddleware := auth.RequireSuperAdmin(jwtMgr)
 			adminHrMiddleware := auth.RequireRoles(jwtMgr, domain.RoleAdmin, domain.RoleHR)
+			adminOnlyMiddleware := auth.RequireRoles(jwtMgr, domain.RoleAdmin)
 
 			mux.Handle("GET /api/v1/auth/me", authMiddleware(http.HandlerFunc(authHandler.Me)))
 
@@ -185,7 +188,17 @@ func main() {
 
 			// Tenant User Management routes
 			mux.Handle("GET /api/v1/companies/{id}/users", adminHrMiddleware(http.HandlerFunc(userHandler.GetCompanyUsers)))
-			mux.Handle("POST /api/v1/companies/{id}/users", authMiddleware(http.HandlerFunc(userHandler.CreateCompanyUser)))
+			mux.Handle("POST /api/v1/companies/{id}/users", adminOnlyMiddleware(http.HandlerFunc(userHandler.CreateCompanyUser)))
+
+			// Leave Management & Policy routes
+			mux.Handle("GET /api/v1/leave/types", authMiddleware(http.HandlerFunc(leaveHandler.GetLeaveTypes)))
+			mux.Handle("GET /api/v1/leave/balances", authMiddleware(http.HandlerFunc(leaveHandler.GetLeaveBalances)))
+			mux.Handle("POST /api/v1/leave/requests", authMiddleware(http.HandlerFunc(leaveHandler.SubmitLeaveRequest)))
+			mux.Handle("GET /api/v1/leave/requests", authMiddleware(http.HandlerFunc(leaveHandler.GetMyLeaveRequests)))
+			mux.Handle("GET /api/v1/companies/{id}/leave-requests", adminHrMiddleware(http.HandlerFunc(leaveHandler.GetCompanyLeaveRequests)))
+			mux.Handle("PATCH /api/v1/leave/requests/{id}", adminHrMiddleware(http.HandlerFunc(leaveHandler.ResolveLeaveRequest)))
+			mux.Handle("GET /api/v1/companies/{id}/leave-policy", authMiddleware(http.HandlerFunc(leaveHandler.GetLeavePolicy)))
+			mux.Handle("PUT /api/v1/companies/{id}/leave-policy", adminHrMiddleware(http.HandlerFunc(leaveHandler.UpdateLeavePolicy)))
 		}
 	} else {
 		log.Println("DATABASE_URL not set, database features disabled")
