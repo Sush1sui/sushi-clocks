@@ -8,6 +8,7 @@ export interface UserResponse {
 	email: string;
 	mobile_number?: string | null;
 	system_role: 'admin' | 'hr' | 'employee';
+	receive_audit_archive?: boolean;
 	created_at: string;
 }
 
@@ -18,6 +19,7 @@ export interface CreateStaffPayload {
 	password: string;
 	mobile_number?: string;
 	system_role: 'hr' | 'employee';
+	receive_audit_archive?: boolean;
 }
 
 export async function getCompanyUsers(
@@ -46,4 +48,18 @@ export async function createCompanyUser(
 		customFetch
 	);
 	return data.user;
+}
+
+export async function updateArchivePreference(
+	receiveArchive: boolean,
+	customFetch: typeof fetch = fetch
+): Promise<{ receive_audit_archive: boolean; message: string }> {
+	return await request<{ receive_audit_archive: boolean; message: string }>(
+		`/api/v1/users/archive-preference`,
+		{
+			method: 'PATCH',
+			body: JSON.stringify({ receive_audit_archive: receiveArchive })
+		},
+		customFetch
+	);
 }

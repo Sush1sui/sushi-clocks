@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -19,9 +20,20 @@ type Config struct {
 
 	BehindProxy        bool
 
+	// Database Connection Pool (0-Cost Scalability)
+	DBMaxConns int32
+	DBMinConns int32
+
 	// MongoDB Telemetry & Audits (Atlas Free Tier)
 	MongoURI     string
 	MongoDBName  string
+
+	// SMTP Email Configuration for 1-Year Audit Archival
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUser     string
+	SMTPPassword string
+	SMTPFrom     string
 
 	// Super Admin Seeder configs
 	SuperAdminEmail     string
@@ -84,6 +96,30 @@ func Load() *Config {
 		mongoDBName = "sushi_clocks"
 	}
 
+	var dbMaxConns int32 = 10
+	if val := os.Getenv("DB_MAX_CONNS"); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 32); err == nil && parsed > 0 {
+			dbMaxConns = int32(parsed)
+		}
+	}
+
+	var dbMinConns int32 = 2
+	if val := os.Getenv("DB_MIN_CONNS"); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 32); err == nil && parsed > 0 {
+			dbMinConns = int32(parsed)
+		}
+	}
+
+	smtpPort := os.Getenv("SMTP_PORT")
+	if smtpPort == "" {
+		smtpPort = "587"
+	}
+
+	smtpFrom := os.Getenv("SMTP_FROM")
+	if smtpFrom == "" {
+		smtpFrom = "noreply@sushi-clocks.local"
+	}
+
 	return &Config{
 		Port:                port,
 		Environment:         env,
@@ -93,8 +129,15 @@ func Load() *Config {
 		JWTAccessTTL:        jwtAccessTTL,
 		JWTRefreshTTL:       jwtRefreshTTL,
 		BehindProxy:         behindProxy,
+		DBMaxConns:          dbMaxConns,
+		DBMinConns:          dbMinConns,
 		MongoURI:            os.Getenv("MONGO_URI"),
 		MongoDBName:         mongoDBName,
+		SMTPHost:            os.Getenv("SMTP_HOST"),
+		SMTPPort:            smtpPort,
+		SMTPUser:            os.Getenv("SMTP_USER"),
+		SMTPPassword:        os.Getenv("SMTP_PASSWORD"),
+		SMTPFrom:            smtpFrom,
 		SuperAdminEmail:     os.Getenv("SUPER_ADMIN_EMAIL"),
 		SuperAdminPassword:  os.Getenv("SUPER_ADMIN_PASSWORD"),
 		SuperAdminFirstName: os.Getenv("SUPER_ADMIN_FIRST_NAME"),

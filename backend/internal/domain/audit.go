@@ -13,4 +13,5 @@ type AuditLog struct {
 	After      any       `bson:"after,omitempty" json:"after,omitempty"`
 	Reason     string    `bson:"reason,omitempty" json:"reason,omitempty"`
 	Timestamp  time.Time `bson:"timestamp" json:"timestamp"`
+	Archived   bool      `bson:"archived,omitempty" json:"archived,omitempty"`
 }

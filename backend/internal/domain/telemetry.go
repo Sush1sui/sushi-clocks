@@ -12,4 +12,5 @@ type PunchTelemetry struct {
 	Device    string    `bson:"device" json:"device"`
 	OS        string    `bson:"os" json:"os"`
 	Browser   string    `bson:"browser" json:"browser"`
+	Archived  bool      `bson:"archived,omitempty" json:"archived,omitempty"`
 }

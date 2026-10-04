@@ -18,6 +18,7 @@ import (
 	"github.com/sushi-clocks/backend/internal/db"
 	"github.com/sushi-clocks/backend/internal/domain"
 	"github.com/sushi-clocks/backend/internal/repository"
+	"github.com/sushi-clocks/backend/internal/service"
 	"github.com/sushi-clocks/backend/internal/sse"
 )
 
@@ -107,18 +108,21 @@ func main() {
 	jwtMgr := auth.NewJWTManager(cfg.JWTSecret, cfg.JWTAccessTTL, cfg.JWTRefreshTTL)
 
 	if cfg.DatabaseURL != "" {
-		pool, err := db.NewPool(ctx, cfg.DatabaseURL)
+		pool, err := db.NewPool(ctx, cfg.DatabaseURL, cfg.DBMaxConns, cfg.DBMinConns)
 		if err != nil {
 			log.Printf("warning: database connection failed: %v", err)
 		} else {
 			defer pool.Close()
 			dbConnected = true
-			log.Println("connected to database successfully")
+			log.Printf("connected to database successfully (pool max: %d, min: %d)", cfg.DBMaxConns, cfg.DBMinConns)
 
 			userRepo := repository.NewUserRepository(pool)
 			companyRepo := repository.NewCompanyRepository(pool)
 			timesheetRepo := repository.NewTimesheetRepository(pool)
 			leaveRepo := repository.NewLeaveRepository(pool)
+			wageRepo := repository.NewWageRepository(pool)
+			payrollSvc := service.NewPayrollService(timesheetRepo, leaveRepo, wageRepo, companyRepo, userRepo)
+			emailSvc := service.NewEmailService(cfg)
 
 			// SSE Real-Time Presence Hub
 			sseHub := sse.NewHub()
@@ -137,6 +141,14 @@ func main() {
 					mongoDB := mongoClient.Database(cfg.MongoDBName)
 					telemetryRepo = repository.NewTelemetryRepository(mongoDB)
 					auditRepo = repository.NewAuditRepository(mongoDB)
+
+					// Ensure 366-day safety TTL indexes in MongoDB
+					_ = telemetryRepo.EnsureIndexes(ctx)
+					_ = auditRepo.EnsureIndexes(ctx)
+
+					// Start automated 1-Year Archival & Email Dispatcher
+					archiveSvc := service.NewArchiveService(telemetryRepo, auditRepo, userRepo, emailSvc)
+					archiveSvc.StartScheduler(ctx, 24*time.Hour)
 				}
 			}
 
@@ -146,8 +158,10 @@ func main() {
 			adjustmentHandler := api.NewAdjustmentHandler(timesheetRepo, auditRepo, sseHub)
 			userHandler := api.NewUserHandler(userRepo)
 			leaveHandler := api.NewLeaveHandler(leaveRepo, auditRepo, sseHub)
+			payrollHandler := api.NewPayrollHandler(payrollSvc)
 
 			rateLimiter := api.NewIPRateLimiter(5.0, 15.0, cfg.BehindProxy) // 5 req/sec with burst 15
+			heavyQueue := api.NewHeavyQueue(2, 30*time.Second)              // Max 2 concurrent heavy queries
 
 			// Auth routes with rate limiting
 			mux.HandleFunc("POST /api/v1/auth/login", rateLimiter.Middleware(authHandler.Login))
@@ -189,6 +203,7 @@ func main() {
 			// Tenant User Management routes
 			mux.Handle("GET /api/v1/companies/{id}/users", adminHrMiddleware(http.HandlerFunc(userHandler.GetCompanyUsers)))
 			mux.Handle("POST /api/v1/companies/{id}/users", adminOnlyMiddleware(http.HandlerFunc(userHandler.CreateCompanyUser)))
+			mux.Handle("PATCH /api/v1/users/archive-preference", authMiddleware(http.HandlerFunc(userHandler.UpdateArchivePreference)))
 
 			// Leave Management & Policy routes
 			mux.Handle("GET /api/v1/leave/types", authMiddleware(http.HandlerFunc(leaveHandler.GetLeaveTypes)))
@@ -199,6 +214,12 @@ func main() {
 			mux.Handle("PATCH /api/v1/leave/requests/{id}", adminHrMiddleware(http.HandlerFunc(leaveHandler.ResolveLeaveRequest)))
 			mux.Handle("GET /api/v1/companies/{id}/leave-policy", authMiddleware(http.HandlerFunc(leaveHandler.GetLeavePolicy)))
 			mux.Handle("PUT /api/v1/companies/{id}/leave-policy", adminHrMiddleware(http.HandlerFunc(leaveHandler.UpdateLeavePolicy)))
+
+			// Payroll calculation & CSV export routes (Queued & concurrency-gated for 0-cost DB safety)
+			mux.Handle("GET /api/v1/payroll/calculate", adminHrMiddleware(http.HandlerFunc(heavyQueue.Middleware(payrollHandler.Calculate))))
+			mux.Handle("GET /api/v1/payroll/export", adminHrMiddleware(http.HandlerFunc(heavyQueue.Middleware(payrollHandler.Export))))
+			mux.Handle("GET /api/v1/companies/{id}/payroll/calculate", adminHrMiddleware(http.HandlerFunc(heavyQueue.Middleware(payrollHandler.Calculate))))
+			mux.Handle("GET /api/v1/companies/{id}/payroll/export", adminHrMiddleware(http.HandlerFunc(heavyQueue.Middleware(payrollHandler.Export))))
 		}
 	} else {
 		log.Println("DATABASE_URL not set, database features disabled")

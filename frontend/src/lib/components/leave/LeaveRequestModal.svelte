@@ -183,7 +183,9 @@
 								{/if}
 							</span>
 							{#if selectedBalance.carried_over_days > 0}
-								<span class="text-blue-400 font-medium">Includes {selectedBalance.carried_over_days}d rollover</span>
+								<span class="text-blue-400 font-medium" title="Unused leave days saved from your previous cycle and added to your balance">
+									Includes {selectedBalance.carried_over_days}d saved from last year
+								</span>
 							{/if}
 						</div>
 					{/if}

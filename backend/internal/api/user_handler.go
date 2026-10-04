@@ -147,13 +147,14 @@ func (h *UserHandler) CreateCompanyUser(w http.ResponseWriter, r *http.Request) 
 
 	// OWASP A01: company_id comes from JWT — not from the request path or body.
 	user := &domain.User{
-		CompanyID:    claims.CompanyID,
-		FirstName:    req.FirstName,
-		LastName:     req.LastName,
-		Email:        req.Email,
-		PasswordHash: passwordHash,
-		MobileNumber: req.MobileNumber,
-		SystemRole:   req.SystemRole,
+		CompanyID:           claims.CompanyID,
+		FirstName:           req.FirstName,
+		LastName:            req.LastName,
+		Email:               req.Email,
+		PasswordHash:        passwordHash,
+		MobileNumber:        req.MobileNumber,
+		SystemRole:          req.SystemRole,
+		ReceiveAuditArchive: req.ReceiveAuditArchive,
 	}
 
 	if err := h.userRepo.CreateCompanyUser(r.Context(), user); err != nil {
@@ -171,3 +172,34 @@ func (h *UserHandler) CreateCompanyUser(w http.ResponseWriter, r *http.Request) 
 		"user": user.ToResponse(),
 	})
 }
+
+// UpdateArchivePreference handles PATCH /api/v1/users/archive-preference
+// Allows HR or Admin users to toggle whether they receive yearly audit archive emails.
+func (h *UserHandler) UpdateArchivePreference(w http.ResponseWriter, r *http.Request) {
+	claims := auth.GetClaims(r.Context())
+	if claims == nil {
+		RespondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	var req struct {
+		ReceiveArchive bool `json:"receive_audit_archive"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		RespondError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if err := h.userRepo.UpdateUserArchivePreference(r.Context(), claims.UserID, claims.CompanyID, req.ReceiveArchive); err != nil {
+		log.Printf("update archive preference error for %s: %v", claims.UserID, err)
+		RespondError(w, http.StatusInternalServerError, "failed to update preference")
+		return
+	}
+
+	RespondOK(w, http.StatusOK, map[string]interface{}{
+		"receive_audit_archive": req.ReceiveArchive,
+		"message":               "archive email preference updated",
+	})
+}
+

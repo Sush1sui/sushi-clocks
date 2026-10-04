@@ -92,8 +92,8 @@
 				
 				<!-- Hover Tooltip -->
 				<div class="pointer-events-none absolute bottom-full right-0 mb-1.5 hidden group-hover:block w-56 p-2 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] shadow-xl text-[10px] text-[var(--text-main)] z-50">
-					<div class="font-semibold text-[#f97040] mb-0.5">Dynamic Cycle Policy</div>
-					Leave allowances and rollover limits apply between these dates and reset automatically.
+					<div class="font-semibold text-[#f97040] mb-0.5">Annual Leave Cycle</div>
+					Your leave allowances and saved unused days apply between these dates and renew automatically.
 				</div>
 			</div>
 		{/if}
@@ -130,8 +130,8 @@
 									{b.is_paid ? 'Paid' : 'Unpaid'}
 								</span>
 								{#if b.carried_over_days > 0}
-									<span class="px-1.5 py-0.2 rounded bg-blue-500/10 border border-blue-500/25 text-blue-400" title="Days carried over from previous reset cycle">
-										+{b.carried_over_days}d rollover
+									<span class="px-1.5 py-0.2 rounded bg-blue-500/10 border border-blue-500/25 text-blue-400" title="Unused days saved from your previous cycle and added to your balance">
+										+{b.carried_over_days}d from last year
 									</span>
 								{/if}
 							</div>

@@ -24,7 +24,7 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 
 func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	query := `
-		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, receive_audit_archive, token_version, created_at
 		FROM users
 		WHERE email = $1
 		LIMIT 1
@@ -39,6 +39,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 		&u.PasswordHash,
 		&u.MobileNumber,
 		&u.SystemRole,
+		&u.ReceiveAuditArchive,
 		&u.TokenVersion,
 		&u.CreatedAt,
 	)
@@ -53,7 +54,7 @@ func (r *UserRepository) GetUserByEmail(ctx context.Context, email string) (*dom
 
 func (r *UserRepository) GetUserByID(ctx context.Context, id string) (*domain.User, error) {
 	query := `
-		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, receive_audit_archive, token_version, created_at
 		FROM users
 		WHERE id = $1
 	`
@@ -67,6 +68,7 @@ func (r *UserRepository) GetUserByID(ctx context.Context, id string) (*domain.Us
 		&u.PasswordHash,
 		&u.MobileNumber,
 		&u.SystemRole,
+		&u.ReceiveAuditArchive,
 		&u.TokenVersion,
 		&u.CreatedAt,
 	)
@@ -162,7 +164,7 @@ func (r *UserRepository) CreateCompany(ctx context.Context, c *domain.Company) e
 // GetUsersByCompanyID returns all non-super-admin users in a tenant company.
 func (r *UserRepository) GetUsersByCompanyID(ctx context.Context, companyID string) ([]domain.User, error) {
 	query := `
-		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, token_version, created_at
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, receive_audit_archive, token_version, created_at
 		FROM users
 		WHERE company_id = $1 AND system_role != 'super_admin'
 		ORDER BY created_at ASC
@@ -185,6 +187,7 @@ func (r *UserRepository) GetUsersByCompanyID(ctx context.Context, companyID stri
 			&u.PasswordHash,
 			&u.MobileNumber,
 			&u.SystemRole,
+			&u.ReceiveAuditArchive,
 			&u.TokenVersion,
 			&u.CreatedAt,
 		); err != nil {
@@ -199,8 +202,8 @@ func (r *UserRepository) GetUsersByCompanyID(ctx context.Context, companyID stri
 // from the authenticated JWT claims — never from the request body.
 func (r *UserRepository) CreateCompanyUser(ctx context.Context, u *domain.User) error {
 	query := `
-		INSERT INTO users (company_id, first_name, last_name, email, password_hash, mobile_number, system_role)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO users (company_id, first_name, last_name, email, password_hash, mobile_number, system_role, receive_audit_archive)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, token_version, created_at
 	`
 	err := r.pool.QueryRow(ctx, query,
@@ -211,10 +214,64 @@ func (r *UserRepository) CreateCompanyUser(ctx context.Context, u *domain.User) 
 		u.PasswordHash,
 		u.MobileNumber,
 		u.SystemRole,
+		u.ReceiveAuditArchive,
 	).Scan(&u.ID, &u.TokenVersion, &u.CreatedAt)
 
 	if err != nil {
 		return fmt.Errorf("insert company user error: %w", err)
+	}
+	return nil
+}
+
+// GetArchiveRecipientsForCompany returns all Admins, plus HR users who have receive_audit_archive enabled.
+func (r *UserRepository) GetArchiveRecipientsForCompany(ctx context.Context, companyID string) ([]domain.User, error) {
+	query := `
+		SELECT id, company_id, first_name, last_name, email, password_hash, mobile_number, system_role, receive_audit_archive, token_version, created_at
+		FROM users
+		WHERE company_id = $1 AND (system_role = 'admin' OR (system_role = 'hr' AND receive_audit_archive = true))
+	`
+	rows, err := r.pool.Query(ctx, query, companyID)
+	if err != nil {
+		return nil, fmt.Errorf("query archive recipients error: %w", err)
+	}
+	defer rows.Close()
+
+	recipients := make([]domain.User, 0)
+	for rows.Next() {
+		var u domain.User
+		if err := rows.Scan(
+			&u.ID,
+			&u.CompanyID,
+			&u.FirstName,
+			&u.LastName,
+			&u.Email,
+			&u.PasswordHash,
+			&u.MobileNumber,
+			&u.SystemRole,
+			&u.ReceiveAuditArchive,
+			&u.TokenVersion,
+			&u.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan archive recipient error: %w", err)
+		}
+		recipients = append(recipients, u)
+	}
+	return recipients, nil
+}
+
+// UpdateUserArchivePreference updates the receive_audit_archive flag for a user.
+func (r *UserRepository) UpdateUserArchivePreference(ctx context.Context, userID, companyID string, enabled bool) error {
+	query := `
+		UPDATE users
+		SET receive_audit_archive = $1
+		WHERE id = $2 AND company_id = $3
+	`
+	tag, err := r.pool.Exec(ctx, query, enabled, userID, companyID)
+	if err != nil {
+		return fmt.Errorf("update user archive preference error: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
 	}
 	return nil
 }

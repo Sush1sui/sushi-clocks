@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -85,6 +86,9 @@ func (r *TimesheetRepository) ClockIn(ctx context.Context, userID, companyID str
 		&t.CreatedAt,
 	)
 	if err != nil {
+		if strings.Contains(err.Error(), "idx_timesheets_active_user") || strings.Contains(err.Error(), "23505") {
+			return nil, ErrAlreadyClockedIn
+		}
 		return nil, fmt.Errorf("insert clock-in timesheet error: %w", err)
 	}
 
@@ -469,4 +473,45 @@ func (r *TimesheetRepository) GetPendingAdjustments(ctx context.Context, company
 	}
 
 	return adjustments, nil
+}
+
+// GetCompanyTimesheetsForPayroll fetches completed timesheets overlapping [start, end] for all users in a company.
+func (r *TimesheetRepository) GetCompanyTimesheetsForPayroll(ctx context.Context, companyID string, start, end time.Time) (map[string][]domain.Timesheet, error) {
+	query := `
+		SELECT id, user_id, company_id, clock_in_time, clock_out_time, status, adjustment_reason, reviewed_by, reviewed_at, created_at
+		FROM timesheets
+		WHERE company_id = $1
+		  AND status = 'completed'
+		  AND clock_out_time IS NOT NULL
+		  AND clock_in_time < $3
+		  AND clock_out_time > $2
+		ORDER BY user_id, clock_in_time ASC
+	`
+	rows, err := r.pool.Query(ctx, query, companyID, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("query company timesheets for payroll error: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string][]domain.Timesheet)
+	for rows.Next() {
+		var t domain.Timesheet
+		if err := rows.Scan(
+			&t.ID,
+			&t.UserID,
+			&t.CompanyID,
+			&t.ClockInTime,
+			&t.ClockOutTime,
+			&t.Status,
+			&t.AdjustmentReason,
+			&t.ReviewedBy,
+			&t.ReviewedAt,
+			&t.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan timesheet for payroll error: %w", err)
+		}
+		result[t.UserID] = append(result[t.UserID], t)
+	}
+
+	return result, nil
 }

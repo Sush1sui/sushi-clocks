@@ -593,3 +593,62 @@ func (r *LeaveRepository) ResolveLeaveRequest(
 
 	return r.GetLeaveRequestByID(ctx, id, companyID)
 }
+
+// GetCompanyApprovedLeavesForPayroll returns all approved leave requests overlapping [start, end]
+// grouped by user ID.
+func (r *LeaveRepository) GetCompanyApprovedLeavesForPayroll(ctx context.Context, companyID string, start, end time.Time) (map[string][]domain.LeaveRequestWithDetails, error) {
+	query := `
+		SELECT lr.id, lr.company_id, lr.user_id, lr.leave_type_id, lr.start_date, lr.end_date,
+		       lr.status, lr.reason, lr.reviewed_by_user_id, lr.reviewed_at, lr.review_notes, lr.created_at,
+		       u.first_name, u.last_name, u.email,
+		       COALESCE(cr.name, u.system_role) AS role_name,
+		       lt.name AS leave_type_name, lt.is_paid,
+		       ((lr.end_date - lr.start_date) + 1) AS calendar_days
+		FROM leave_requests lr
+		JOIN users u ON u.id = lr.user_id
+		JOIN leave_types lt ON lt.id = lr.leave_type_id
+		LEFT JOIN user_roles ur ON ur.user_id = u.id
+		LEFT JOIN company_roles cr ON cr.id = ur.role_id
+		WHERE lr.company_id = $1
+		  AND lr.status = 'approved'
+		  AND lr.start_date <= $3
+		  AND lr.end_date >= $2
+		ORDER BY lr.user_id, lr.start_date ASC
+	`
+	rows, err := r.pool.Query(ctx, query, companyID, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("query company leaves for payroll error: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string][]domain.LeaveRequestWithDetails)
+	for rows.Next() {
+		var item domain.LeaveRequestWithDetails
+		if err := rows.Scan(
+			&item.ID,
+			&item.CompanyID,
+			&item.UserID,
+			&item.LeaveTypeID,
+			&item.StartDate,
+			&item.EndDate,
+			&item.Status,
+			&item.Reason,
+			&item.ReviewedByUserID,
+			&item.ReviewedAt,
+			&item.ReviewNotes,
+			&item.CreatedAt,
+			&item.UserFirstName,
+			&item.UserLastName,
+			&item.UserEmail,
+			&item.RoleName,
+			&item.LeaveTypeName,
+			&item.IsPaid,
+			&item.CalendarDays,
+		); err != nil {
+			return nil, fmt.Errorf("scan leave for payroll error: %w", err)
+		}
+		result[item.UserID] = append(result[item.UserID], item)
+	}
+
+	return result, nil
+}

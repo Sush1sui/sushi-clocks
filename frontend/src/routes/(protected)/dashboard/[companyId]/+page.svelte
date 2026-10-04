@@ -46,6 +46,7 @@
 	import LeaveRequestModal from '$lib/components/leave/LeaveRequestModal.svelte';
 	import LeaveQueue from '$lib/components/leave/LeaveQueue.svelte';
 	import LeavePolicyModal from '$lib/components/leave/LeavePolicyModal.svelte';
+	import PayrollCenter from '$lib/components/payroll/PayrollCenter.svelte';
 	import type { LeaveBalance, LeavePeriod } from '$lib/api/leave';
 
 	let isLoggingOut = $state(false);
@@ -58,6 +59,7 @@
 	let adjustmentQueueRef = $state<any>(null);
 	let leaveAllowanceRef = $state<any>(null);
 	let leaveQueueRef = $state<any>(null);
+	let payrollCenterRef = $state<any>(null);
 	let sseConnected = $state(false);
 	let sseDisconnect: (() => void) | null = null;
 
@@ -518,6 +520,10 @@
 							<!-- Payroll Reports -->
 							<button
 								type="button"
+								onclick={() => {
+									payrollCenterRef?.handleCalculate?.();
+									document.getElementById('payroll-center-section')?.scrollIntoView({ behavior: 'smooth' });
+								}}
 								class="p-3.5 rounded-lg bg-[var(--surface-raised)] border border-[var(--border)] hover:border-[#f97040]/50 transition-colors text-left group cursor-pointer"
 							>
 								<div class="flex items-start justify-between">
@@ -571,6 +577,12 @@
 							refreshAttendance();
 							if (shiftHistoryRef?.loadHistory) shiftHistoryRef.loadHistory();
 						}}
+					/>
+
+					<!-- Payroll Calculation & Export Engine -->
+					<PayrollCenter
+						bind:this={payrollCenterRef}
+						companyId={company?.id ?? ''}
 					/>
 
 					<!-- Admin Personal Shift History -->

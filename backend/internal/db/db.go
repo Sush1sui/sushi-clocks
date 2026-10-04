@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
+func NewPool(ctx context.Context, databaseURL string, maxConns, minConns int32) (*pgxpool.Pool, error) {
 	if databaseURL == "" {
 		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
@@ -18,8 +18,15 @@ func NewPool(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("parse database url error: %w", err)
 	}
 
-	config.MaxConns = 25
-	config.MinConns = 2
+	if maxConns <= 0 {
+		maxConns = 10
+	}
+	if minConns <= 0 {
+		minConns = 2
+	}
+
+	config.MaxConns = maxConns
+	config.MinConns = minConns
 	config.MaxConnLifetime = time.Hour
 	config.MaxConnIdleTime = 30 * time.Minute
 

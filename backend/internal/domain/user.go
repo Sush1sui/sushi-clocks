@@ -14,16 +14,17 @@ const (
 )
 
 type User struct {
-	ID           string    `json:"id"`
-	CompanyID    string    `json:"company_id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	MobileNumber *string   `json:"mobile_number,omitempty"`
-	SystemRole   string    `json:"system_role"`
-	TokenVersion int       `json:"-"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                  string    `json:"id"`
+	CompanyID           string    `json:"company_id"`
+	FirstName           string    `json:"first_name"`
+	LastName            string    `json:"last_name"`
+	Email               string    `json:"email"`
+	PasswordHash        string    `json:"-"`
+	MobileNumber        *string   `json:"mobile_number,omitempty"`
+	SystemRole          string    `json:"system_role"`
+	ReceiveAuditArchive bool      `json:"receive_audit_archive"`
+	TokenVersion        int       `json:"-"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 type Company struct {
@@ -37,38 +38,41 @@ type Company struct {
 }
 
 type UserResponse struct {
-	ID           string    `json:"id"`
-	CompanyID    string    `json:"company_id"`
-	FirstName    string    `json:"first_name"`
-	LastName     string    `json:"last_name"`
-	Email        string    `json:"email"`
-	MobileNumber *string   `json:"mobile_number,omitempty"`
-	SystemRole   string    `json:"system_role"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID                  string    `json:"id"`
+	CompanyID           string    `json:"company_id"`
+	FirstName           string    `json:"first_name"`
+	LastName            string    `json:"last_name"`
+	Email               string    `json:"email"`
+	MobileNumber        *string   `json:"mobile_number,omitempty"`
+	SystemRole          string    `json:"system_role"`
+	ReceiveAuditArchive bool      `json:"receive_audit_archive"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 func (u *User) ToResponse() UserResponse {
 	return UserResponse{
-		ID:           u.ID,
-		CompanyID:    u.CompanyID,
-		FirstName:    u.FirstName,
-		LastName:     u.LastName,
-		Email:        u.Email,
-		MobileNumber: u.MobileNumber,
-		SystemRole:   u.SystemRole,
-		CreatedAt:    u.CreatedAt,
+		ID:                  u.ID,
+		CompanyID:           u.CompanyID,
+		FirstName:           u.FirstName,
+		LastName:            u.LastName,
+		Email:               u.Email,
+		MobileNumber:        u.MobileNumber,
+		SystemRole:          u.SystemRole,
+		ReceiveAuditArchive: u.ReceiveAuditArchive,
+		CreatedAt:           u.CreatedAt,
 	}
 }
 
 // CreateStaffRequest is the payload for Admin creating a new HR or Employee account.
 // SystemRole must be "hr" or "employee" — handler rejects any escalation attempt.
 type CreateStaffRequest struct {
-	FirstName    string  `json:"first_name"`
-	LastName     string  `json:"last_name"`
-	Email        string  `json:"email"`
-	Password     string  `json:"password"`
-	MobileNumber *string `json:"mobile_number,omitempty"`
-	SystemRole   string  `json:"system_role"` // only "hr" or "employee" allowed
+	FirstName           string  `json:"first_name"`
+	LastName            string  `json:"last_name"`
+	Email               string  `json:"email"`
+	Password            string  `json:"password"`
+	MobileNumber        *string `json:"mobile_number,omitempty"`
+	SystemRole          string  `json:"system_role"` // only "hr" or "employee" allowed
+	ReceiveAuditArchive bool    `json:"receive_audit_archive"`
 }
 
 type LoginRequest struct {
